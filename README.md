@@ -1,6 +1,8 @@
 # seedz-tech-interview
 Technichal interview for Seedz company
 
+Repository Link: https://github.com/gv-public/seedz-tech-interview
+
 The techinical challenge was divided in two steps
 
 1. Answering some Data Science questions based on the SQL and JSON file provided.
