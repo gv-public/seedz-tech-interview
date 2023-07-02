@@ -3,6 +3,7 @@ from datetime import datetime
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_file
 
@@ -18,12 +19,26 @@ from queries import (
 load_dotenv()
 app = Flask(__name__)
 
-connection = psycopg2.connect(
-    host=os.getenv('HOST'),
-    database=os.getenv('DATABASE'),
-    user=os.getenv('DATABASE_USER'),
-    password=os.getenv('PASSWORD')
-)
+
+def get_db_connection():
+    connection_pool = psycopg2.pool.SimpleConnectionPool(
+        minconn=1,
+        maxconn=10,
+        host=os.getenv('HOST'),
+        database=os.getenv('DATABASE'),
+        user=os.getenv('DATABASE_USER'),
+        password=os.getenv('PASSWORD')
+    )
+
+    connection = connection_pool.getconn()
+    return connection
+
+
+def close_db_connection(cursor, connection, connection_pool):
+    cursor.close()
+    connection_pool.putconn(connection)
+    connection_pool.closeall()
+
 
 required_fields = ['cod_city', 'date', 'hour']
 non_required_fields = [
@@ -77,6 +92,7 @@ def create_weather():
     # Set non-required fields to None if they arrive empty
     data = check_dict_keys(data, non_required_fields)
 
+    connection = get_db_connection()
     with connection:
         with connection.cursor() as cursor:
             cursor.execute(INSERT_WEATHER, (data['cod_city'], data['date'], data['hour'], data['precipitation'], data['dry_bulb_temperature'], data['wet_bulb_temperature'], data['high_temperature'], 
@@ -90,6 +106,8 @@ def create_weather():
 def list_cities():
 
     try:
+        connection = get_db_connection()
+
         with connection:
             with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(GET_CITIES_LIST, ())
@@ -108,6 +126,8 @@ def list_weather():
         cod_city = str(request.args.get('cod_city'))
 
         try:
+            connection = get_db_connection()
+
             with connection:
                 with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                     cursor.execute(GET_WEATHER_CITY, (cod_city,))
@@ -132,6 +152,8 @@ def get_weather_by_date():
         second_date = str(request.args.get('second_date'))
 
         try:
+            connection = get_db_connection()
+
             with connection:
                 with connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
 
@@ -158,6 +180,8 @@ def delete_weather():
         cod_city = str(request.args.get('cod_city'))
 
         try:
+            connection = get_db_connection()
+
             with connection:
                 with connection.cursor() as cursor:
                     cursor.execute(DELETE_WEATHER_DATA, (cod_city, first_date))
